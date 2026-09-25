@@ -49,6 +49,8 @@ function App() {
   }
 
   const acceptAuthenticatedWallet = useCallback((value) => {
+    setPortfolioOwner('');
+    setHoldings(initialHoldings);
     setWalletAddress(value);
     setPortfolioLoaded(false);
   }, []);
@@ -57,13 +59,25 @@ function App() {
     let cancelled = false;
     async function loadPortfolio() {
       if (!supabase || !walletAddress) return;
+      setPortfolioOwner('');
+      setHoldings(initialHoldings);
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (cancelled) return;
       if (userError || !user) { setPortfolioLoaded(true); return; }
+      const authenticatedWallet = user.identities?.find((identity) => identity.provider === 'web3')?.identity_data?.sub;
+      if (authenticatedWallet !== walletAddress) {
+        setPortfolioLoaded(true);
+        return;
+      }
       const { data, error } = await supabase.from('wallet_portfolios')
         .select('owner_id, wallet_address, holdings')
         .eq('owner_id', user.id).eq('wallet_address', walletAddress).maybeSingle();
       if (cancelled) return;
-      if (error) notify('Не удалось загрузить портфель из Supabase');
+      if (error) {
+        notify('Не удалось загрузить портфель из Supabase');
+        setPortfolioLoaded(true);
+        return;
+      }
       if (data?.holdings && Array.isArray(data.holdings)) setHoldings(data.holdings);
       setPortfolioOwner(user.id);
       setPortfolioLoaded(true);
