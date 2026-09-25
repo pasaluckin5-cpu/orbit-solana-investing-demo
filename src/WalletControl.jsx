@@ -62,24 +62,39 @@ export default function WalletControl({ notify, onAuthenticatedAddress }) {
   }
 
   async function signInForSync() {
-    if (!supabase || !window.solana) {
-      setAuthError('Для постоянного хранения подключите Supabase и кошелёк Phantom.');
+    if (!supabase) {
+      setAuthError('Для постоянного хранения сначала настройте Supabase.');
+      return;
+    }
+    if (!connected) {
+      setAuthError('Сначала подключите кошелёк Solana.');
+      return;
+    }
+    if (!connected.wallet.features?.['solana:signIn']) {
+      setAuthError('Этот кошелёк не поддерживает безопасный вход Solana Sign-In.');
       return;
     }
     setAuthBusy(true);
     setAuthError('');
-    const { data, error } = await supabase.auth.signInWithWeb3({
-      chain: 'solana',
-      wallet: window.solana,
-      statement: 'Войти в Orbit и сохранить демо-портфель в Supabase.',
-    });
-    setAuthBusy(false);
-    if (error) { setAuthError(error.message); return; }
-    const identity = data.user?.identities?.find((item) => item.provider === 'web3');
-    const wallet = identity?.identity_data?.sub || addressValue || '';
-    setSignedInAddress(wallet);
-    if (wallet) onAuthenticatedAddress?.(wallet);
-    notify('Кошелёк подтверждён для сохранения');
+    try {
+      const { data, error } = await supabase.auth.signInWithWeb3({
+        chain: 'solana',
+        wallet: {
+          signIn: (input) => client.wallet.signIn(connected.wallet, input),
+        },
+        statement: 'Войти в Orbit и сохранить демо-портфель в Supabase.',
+      });
+      if (error) { setAuthError(error.message); return; }
+      const identity = data.user?.identities?.find((item) => item.provider === 'web3');
+      const wallet = identity?.identity_data?.sub || addressValue || '';
+      setSignedInAddress(wallet);
+      if (wallet) onAuthenticatedAddress?.(wallet);
+      notify('Кошелёк подтверждён для сохранения');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Не удалось подтвердить кошелёк.');
+    } finally {
+      setAuthBusy(false);
+    }
   }
 
   const addressValue = connected?.account.address;
@@ -99,7 +114,7 @@ export default function WalletControl({ notify, onAuthenticatedAddress }) {
           <div className="wallet-balance"><span>Баланс SOL</span><strong>{balanceStatus === 'fetching' ? 'Загрузка…' : balanceStatus === 'error' ? 'Не удалось получить' : `${(Number(balance?.value ?? 0) / 1_000_000_000).toFixed(4)} SOL`}</strong></div>
           {balanceStatus === 'error' && <button className="wallet-retry" onClick={() => refresh()}>Повторить запрос</button>}
           <p className="wallet-privacy">Orbit читает публичный адрес и баланс через Solana RPC. Подпись запрашивается только при включении постоянного сохранения; приватный ключ остаётся в кошельке. Транзакции приложение не отправляет.</p>
-          {signedInAddress ? <p className="wallet-privacy">Постоянное сохранение включено для подтверждённого кошелька.</p> : <button className="wallet-retry" onClick={signInForSync} disabled={authBusy}>{authBusy ? 'Подтвердите вход в кошельке…' : 'Включить постоянное сохранение'}</button>}
+          {signedInAddress === addressValue ? <p className="wallet-privacy">Постоянное сохранение включено для подтверждённого кошелька.</p> : <button className="wallet-retry" onClick={signInForSync} disabled={authBusy}>{authBusy ? 'Подтвердите вход в кошельке…' : 'Включить постоянное сохранение'}</button>}
           {authError && <p className="wallet-error" role="alert">{authError}</p>}
           <button className="wallet-disconnect" onClick={disconnectWallet} disabled={disconnect.isRunning}><LogOut size={14} /> Отключить</button>
         </> : <>
