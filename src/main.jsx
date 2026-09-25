@@ -1,10 +1,14 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import { ClientProvider } from '@solana/react';
+import { solanaClient } from './solanaClient.js';
 import './styles.css';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <ClientProvider client={solanaClient}>
+      <App />
+    </ClientProvider>
   </React.StrictMode>,
 );
