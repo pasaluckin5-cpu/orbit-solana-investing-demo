@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownLeft, ArrowDownToLine, ArrowUpRight, BarChart3, BriefcaseBusiness,
   Check, ChevronDown, CircleHelp, Clock3, Home, Menu, Plus, Search, ShieldCheck,
   Sparkles, Wallet, X,
 } from 'lucide-react';
+import WalletControl from './WalletControl.jsx';
+import { supabase } from './supabase.js';
 
 const assets = [
   { ticker: 'AAPL', name: 'Apple', category: 'Технологии', price: 227.52, change: 1.24, tint: 'silver', symbol: 'A' },
@@ -35,6 +37,9 @@ function App() {
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState('');
   const [activeTab, setActiveTab] = useState('Главная');
+  const [walletAddress, setWalletAddress] = useState('');
+  const [portfolioOwner, setPortfolioOwner] = useState('');
+  const [portfolioLoaded, setPortfolioLoaded] = useState(false);
   const total = useMemo(() => holdings.reduce((sum, item) => sum + item.value, 0), [holdings]) + 142.31;
   const filteredAssets = assets.filter((asset) => `${asset.name} ${asset.ticker}`.toLowerCase().includes(search.toLowerCase()));
 
@@ -42,6 +47,44 @@ function App() {
     setToast(message);
     window.setTimeout(() => setToast(''), 2600);
   }
+
+  const acceptAuthenticatedWallet = useCallback((value) => {
+    setWalletAddress(value);
+    setPortfolioLoaded(false);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPortfolio() {
+      if (!supabase || !walletAddress) return;
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) { setPortfolioLoaded(true); return; }
+      const { data, error } = await supabase.from('wallet_portfolios')
+        .select('owner_id, wallet_address, holdings')
+        .eq('owner_id', user.id).eq('wallet_address', walletAddress).maybeSingle();
+      if (cancelled) return;
+      if (error) notify('Не удалось загрузить портфель из Supabase');
+      if (data?.holdings && Array.isArray(data.holdings)) setHoldings(data.holdings);
+      setPortfolioOwner(user.id);
+      setPortfolioLoaded(true);
+    }
+    loadPortfolio();
+    return () => { cancelled = true; };
+  }, [walletAddress]);
+
+  useEffect(() => {
+    if (!supabase || !portfolioLoaded || !portfolioOwner || !walletAddress) return;
+    const timeout = window.setTimeout(async () => {
+      const { error } = await supabase.from('wallet_portfolios').upsert({
+        owner_id: portfolioOwner,
+        wallet_address: walletAddress,
+        holdings,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'owner_id,wallet_address' });
+      if (error) notify('Не удалось сохранить портфель в Supabase');
+    }, 450);
+    return () => window.clearTimeout(timeout);
+  }, [holdings, portfolioLoaded, portfolioOwner, walletAddress]);
 
   function buy() {
     const usd = Number(amount);
@@ -68,7 +111,7 @@ function App() {
         <nav className="desktop-nav" aria-label="Основная навигация">
           {['Главная', 'Рынок', 'Портфель'].map((tab) => <button key={tab} className={activeTab === tab ? 'nav-link selected' : 'nav-link'} onClick={() => setActiveTab(tab)}>{tab}</button>)}
         </nav>
-        <div className="top-actions"><span className="network-pill"><i /> Solana · Demo</span><button className="wallet-button" onClick={() => notify('Подключение кошелька появится после выбора провайдера')}><Wallet size={15} /> Подключить кошелёк</button><button className="mobile-menu" aria-label="Меню"><Menu /></button></div>
+        <div className="top-actions"><span className="network-pill"><i /> Solana · Mainnet</span><WalletControl notify={notify} onAuthenticatedAddress={acceptAuthenticatedWallet} /><button className="mobile-menu" aria-label="Меню"><Menu /></button></div>
       </header>
 
       <main id="top">
