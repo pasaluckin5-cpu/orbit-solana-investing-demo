@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import WalletControl from "./WalletControl";
 import Market from "./Market";
 
@@ -7,38 +7,77 @@ export default function App() {
   const [balance, setBalance] = useState(null);
   const [rpcStatus, setRpcStatus] = useState("Connected");
   const [activeTab, setActiveTab] = useState("market");
-  const [portfolio, setPortfolio] = useState([]);
+  
+  // Загружаем портфель из localStorage, чтобы он не пропадал при обновлении страницы
+  const [portfolio, setPortfolio] = useState(() => {
+    const saved = localStorage.getItem("orbit_portfolio");
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  // Реальная обработка покупки с проверкой баланса
+  const [notification, setNotification] = useState(null);
+
+  // Сохраняем портфель в localStorage при любых изменениях
+  useEffect(() => {
+    localStorage.setItem("orbit_portfolio", JSON.stringify(portfolio));
+  }, [portfolio]);
+
+  // Функция показа красивых уведомлений
+  const showToast = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
+  // Обработка покупки актива с генерацией Solana TxID
   const handleBuyStock = async (stock) => {
     if (!wallet) {
-      alert("Сначала подключите кошелек Phantom в правом верхнем углу!");
+      showToast("Сначала подключите кошелек Phantom в правом верхнем углу!", "error");
       return;
     }
 
-    // Простая проверка средств (для демонстрации)
-    if (balance !== null && balance < 0.01) {
-      alert("Недостаточно средств на кошельке для оплаты газа и транзакции!");
+    if (balance !== null && Number(balance) < 0.005) {
+      showToast("Недостаточно SOL на кошельке для оплаты газа сети!", "error");
       return;
     }
 
     try {
-      const provider = window.solana;
-      if (provider) {
-        alert(`Подтвердите смарт-контракт покупки ${stock.symbol} на сумму $${stock.price} в кошельке Phantom...`);
-      }
+      showToast(`Подтвердите транзакцию ${stock.symbol}.sol в Phantom...`, "info");
       
-      // Добавляем акцию в реальный портфель пользователя
-      setPortfolio([...portfolio, { ...stock, shares: 1, date: new Date().toLocaleDateString() }]);
-      alert(`Успешно! Токен ${stock.symbol} добавлен в ваш ончейн-портфель.`);
+      // Имитация задержки блокчейна Solana (обычно ~400мс)
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      // Генерируем фейковый хэш транзакции Solana для убедительности
+      const mockTxId = "5K" + Math.random().toString(36).substring(2, 10) + "..." + Math.random().toString(36).substring(2, 6);
+
+      const newItem = {
+        ...stock,
+        shares: 1,
+        txId: mockTxId,
+        date: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setPortfolio([newItem, ...portfolio]);
+      showToast(`Успешно! Токен ${stock.symbol}.sol куплен и записан в Solana.`, "success");
+
     } catch (err) {
       console.error("Ошибка транзакции:", err);
-      alert("Транзакция отменена пользователем.");
+      showToast("Транзакция была отменена пользователем.", "error");
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white font-sans antialiased">
+    <div className="min-h-screen bg-slate-950 text-white font-sans antialiased relative">
+      
+      {/* Всплывающие уведомления (Toast) */}
+      {notification && (
+        <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl border shadow-2xl text-sm flex items-center gap-3 backdrop-blur-md transition-all animate-bounce ${
+          notification.type === "error" ? "bg-red-950/90 border-red-800 text-red-200" :
+          notification.type === "info" ? "bg-blue-950/90 border-blue-800 text-blue-200" :
+          "bg-purple-950/90 border-purple-800 text-purple-200"
+        }`}>
+          <span>{notification.message}</span>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         
         {/* Шапка */}
@@ -75,7 +114,7 @@ export default function App() {
           </button>
         </div>
 
-        {/* Основной контент */}
+        {/* Контент */}
         <main className="space-y-6">
           {activeTab === "market" ? (
             <Market onBuyStock={handleBuyStock} balance={balance} />
@@ -93,26 +132,31 @@ export default function App() {
               {portfolio.length === 0 ? (
                 <div className="text-center py-12 space-y-3">
                   <p className="text-sm text-slate-400">
-                    У вас пока нет купленных токенизированных активов.
+                    У вас пока нет купленных активов. Перейдите во вкладку «Рынок акций».
                   </p>
                   <button 
                     onClick={() => setActiveTab("market")}
                     className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl transition"
                   >
-                    Перейти к рынку акций
+                    Перейти к рынку
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {portfolio.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl">
+                    <div key={idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-slate-950/60 border border-slate-800/80 rounded-xl gap-2">
                       <div>
-                        <h4 className="font-medium text-white">{item.symbol}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-white">{item.symbol}.sol</h4>
+                          <span className="text-[10px] font-mono text-purple-400 bg-purple-950/40 px-2 py-0.5 rounded border border-purple-900/40">
+                            Tx: {item.txId}
+                          </span>
+                        </div>
                         <p className="text-xs text-slate-400">{item.name}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold text-white">${item.price}</p>
-                        <p className="text-xs text-green-400 font-medium">Куплено: {item.date}</p>
+                        <p className="text-xs text-green-400 font-medium">{item.date}</p>
                       </div>
                     </div>
                   ))}
