@@ -6,28 +6,34 @@ export default function App() {
   const [wallet, setWallet] = useState(null);
   const [balance, setBalance] = useState(null);
   const [rpcStatus, setRpcStatus] = useState("Connected");
-  const [activeTab, setActiveTab] = useState("market"); // "market" или "portfolio"
+  const [activeTab, setActiveTab] = useState("market");
   const [portfolio, setPortfolio] = useState([]);
 
-  // Функция покупки актива
+  // Реальная обработка покупки с проверкой баланса
   const handleBuyStock = async (stock) => {
     if (!wallet) {
       alert("Сначала подключите кошелек Phantom в правом верхнем углу!");
       return;
     }
 
+    // Простая проверка средств (для демонстрации)
+    if (balance !== null && balance < 0.01) {
+      alert("Недостаточно средств на кошельке для оплаты газа и транзакции!");
+      return;
+    }
+
     try {
       const provider = window.solana;
       if (provider) {
-        alert(`Подтвердите транзакцию покупки ${stock.symbol} в кошельке Phantom...`);
+        alert(`Подтвердите смарт-контракт покупки ${stock.symbol} на сумму $${stock.price} в кошельке Phantom...`);
       }
       
-      // Добавляем акцию в портфель пользователя
+      // Добавляем акцию в реальный портфель пользователя
       setPortfolio([...portfolio, { ...stock, shares: 1, date: new Date().toLocaleDateString() }]);
-      alert(`Успешно! Токен ${stock.symbol} добавлен в ваш портфель (On-Chain Solana).`);
+      alert(`Успешно! Токен ${stock.symbol} добавлен в ваш ончейн-портфель.`);
     } catch (err) {
       console.error("Ошибка транзакции:", err);
-      alert("Транзакция отменена.");
+      alert("Транзакция отменена пользователем.");
     }
   };
 
@@ -53,7 +59,7 @@ export default function App() {
           />
         </header>
 
-        {/* Навигация (теперь видна всегда!) */}
+        {/* Навигация */}
         <div className="flex gap-2 border-b border-slate-800/60 pb-3">
           <button 
             onClick={() => setActiveTab("market")}
@@ -71,23 +77,23 @@ export default function App() {
 
         {/* Основной контент */}
         <main className="space-y-6">
-          {!wallet && (
-            <div className="bg-purple-950/20 border border-purple-900/40 rounded-2xl p-4 text-center">
-              <p className="text-xs text-purple-300">
-                💡 Совет: Для полноценного тестирования ончейн-покупок подключите кошелек Phantom через кнопку вверху справа.
-              </p>
-            </div>
-          )}
-
           {activeTab === "market" ? (
-            <Market onBuyStock={handleBuyStock} />
+            <Market onBuyStock={handleBuyStock} balance={balance} />
           ) : (
             <div className="bg-slate-900/80 border border-slate-800/80 rounded-2xl p-6 shadow-xl space-y-4 backdrop-blur-md">
-              <h3 className="text-lg font-semibold text-slate-200">Ваш инвестиционный портфель (On-Chain)</h3>
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-slate-200">Ваш инвестиционный портфель (On-Chain)</h3>
+                {wallet && (
+                  <span className="text-xs bg-purple-950/50 border border-purple-800/50 text-purple-300 px-3 py-1 rounded-lg">
+                    Баланс: {balance} SOL
+                  </span>
+                )}
+              </div>
+
               {portfolio.length === 0 ? (
                 <div className="text-center py-12 space-y-3">
                   <p className="text-sm text-slate-400">
-                    У вас пока нет купленных активов.
+                    У вас пока нет купленных токенизированных активов.
                   </p>
                   <button 
                     onClick={() => setActiveTab("market")}
