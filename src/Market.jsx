@@ -74,6 +74,7 @@ export default function Market({ onBuyStock, balance }) {
 
         if (isMounted) {
           setStocks(updatedStocks);
+          // Синхронизируем выбранный актив с новыми живыми данными
           setSelectedStock(prev => updatedStocks.find(s => s.symbol === prev.symbol) || updatedStocks[0]);
           setIsLive(true);
         }
@@ -81,11 +82,21 @@ export default function Market({ onBuyStock, balance }) {
         // Fallback-гибрид: если упираемся в лимиты API, плавно поддерживаем живые микротиковские изменения
         if (isMounted) {
           setIsLive(false);
-          setStocks(prev => prev.map(stock => {
-            const fluctuation = (Math.random() * 0.6 - 0.3);
-            const newPrice = +(stock.price + fluctuation).toFixed(2);
-            return { ...stock, price: newPrice };
-          }));
+          setStocks(prevStocks => {
+            const newStocks = prevStocks.map(stock => {
+              const fluctuation = (Math.random() * 0.6 - 0.3);
+              const newPrice = +(stock.price + fluctuation).toFixed(2);
+              return { ...stock, price: newPrice };
+            });
+            
+            // Также обновляем selectedStock, чтобы цена справа менялась вместе с fallback-симуляцией
+            setSelectedStock(prevSelected => {
+              const found = newStocks.find(s => s.symbol === prevSelected.symbol);
+              return found || newStocks[0];
+            });
+
+            return newStocks;
+          });
         }
       }
     };
