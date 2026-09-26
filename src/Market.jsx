@@ -3,9 +3,41 @@ import React, { useState, useEffect } from "react";
 const FINNHUB_API_KEY = "darsgppr01qunbohgshgdarsgppr01qunbohgsi0";
 
 const INITIAL_STOCKS = [
-  { symbol: "AAPL", name: "Apple Inc. (Tokenized)", fallbackPrice: 185.50, change: "+2.4%", description: "Токенизированные акции Apple на Solana блокчейне." },
-  { symbol: "TSLA", name: "Tesla, Inc. (Tokenized)", fallbackPrice: 240.20, change: "-1.1%", description: "Электромобили и чистая энергия в ончейн-обертке." },
-  { symbol: "SPY", name: "S&P 500 ETF (Tokenized)", fallbackPrice: 510.00, change: "+0.8%", description: "Широкий индекс рынка акций США с мгновенным расчетом." },
+  { 
+    symbol: "AAPL", 
+    name: "Apple Inc. (Tokenized)", 
+    fallbackPrice: 226.50, 
+    change: "+1.25%", 
+    description: "Токенизированные акции Apple на Solana блокчейне. Обеспечены реальными ценными бумагами через смарт-контракты." 
+  },
+  { 
+    symbol: "TSLA", 
+    name: "Tesla, Inc. (Tokenized)", 
+    fallbackPrice: 248.40, 
+    change: "-0.85%", 
+    description: "Электромобили и чистая энергия в ончейн-обертке. Торгуется 24/7 в децентрализованном пуле ликвидности." 
+  },
+  { 
+    symbol: "SPY", 
+    name: "S&P 500 ETF (Tokenized)", 
+    fallbackPrice: 545.20, 
+    change: "+0.45%", 
+    description: "Широкий индекс рынка акций США с мгновенным расчетом в токенах SOL и стейблкоинах." 
+  },
+  { 
+    symbol: "NVDA", 
+    name: "NVIDIA Corporation (Tokenized)", 
+    fallbackPrice: 128.00, 
+    change: "+3.40%", 
+    description: "Лидер искусственного интеллекта и графических чипов, доступный инвесторам по всему миру через Solana." 
+  },
+  { 
+    symbol: "MSFT", 
+    name: "Microsoft Corporation (Tokenized)", 
+    fallbackPrice: 440.10, 
+    change: "+0.90%", 
+    description: "Облачные технологии и экосистема Windows в виде цифрового актива на высокоскоростном блокчейне." 
+  }
 ];
 
 export default function Market({ onBuyStock, balance }) {
@@ -15,7 +47,6 @@ export default function Market({ onBuyStock, balance }) {
   const [selectedStock, setSelectedStock] = useState(stocks[0]);
   const [isLive, setIsLive] = useState(false);
 
-  // Умный Fallback-симулятор и реальный API гибрид
   useEffect(() => {
     let isMounted = true;
 
@@ -23,15 +54,21 @@ export default function Market({ onBuyStock, balance }) {
       try {
         const updatedStocks = await Promise.all(
           INITIAL_STOCKS.map(async (stock) => {
-            const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${stock.symbol}&token=${FINNHUB_API_KEY}`);
+            // Запрос через безопасный прокси для обхода CORS и получения реальных данных Finnhub
+            const targetUrl = `https://finnhub.io/api/v1/quote?symbol=${stock.symbol}&token=${FINNHUB_API_KEY}`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+            
+            const res = await fetch(proxyUrl);
             const data = await res.json();
             
-            if (data && data.c) {
+            if (data && data.c && data.c > 0) {
               const currentPrice = data.c;
-              const percentChange = data.dp ? (data.dp >= 0 ? `+${data.dp.toFixed(2)}%` : `${data.dp.toFixed(2)}%`) : stock.change;
+              const percentChange = data.dp !== undefined 
+                ? (data.dp >= 0 ? `+${data.dp.toFixed(2)}%` : `${data.dp.toFixed(2)}%`) 
+                : stock.change;
               return { ...stock, price: currentPrice, change: percentChange };
             }
-            throw new Error("Invalid data");
+            throw new Error("Invalid API data");
           })
         );
 
@@ -41,7 +78,7 @@ export default function Market({ onBuyStock, balance }) {
           setIsLive(true);
         }
       } catch (error) {
-        // Fallback-симулятор: если сеть упала или лимит API исчерпан, имитируем живые тики без зависания
+        // Fallback-гибрид: если упираемся в лимиты API, плавно поддерживаем живые микротиковские изменения
         if (isMounted) {
           setIsLive(false);
           setStocks(prev => prev.map(stock => {
@@ -54,7 +91,7 @@ export default function Market({ onBuyStock, balance }) {
     };
 
     fetchMarketData();
-    const interval = setInterval(fetchMarketData, 5000); // обновление каждые 5 секунд
+    const interval = setInterval(fetchMarketData, 4000); // обновление каждые 4 секунды
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -64,44 +101,46 @@ export default function Market({ onBuyStock, balance }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       
-      {/* Список активов */}
+      {/* Список активов (Левая колонка) */}
       <div className="md:col-span-1 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-5 shadow-2xl space-y-3 backdrop-blur-xl">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Рынок активов</h3>
           <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono flex items-center gap-1.5 ${isLive ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>
             <span className={`w-1.5 h-1.5 rounded-full animate-ping ${isLive ? "bg-emerald-400" : "bg-amber-400"}`}></span>
-            {isLive ? "Live Finnhub" : "Smart Fallback Feed"}
+            {isLive ? "Live Finnhub Feed" : "Smart Fallback Feed"}
           </span>
         </div>
 
-        {stocks.map((stock) => (
-          <div 
-            key={stock.symbol}
-            onClick={() => setSelectedStock(stock)}
-            className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${
-              selectedStock.symbol === stock.symbol 
-                ? "bg-purple-950/40 border-purple-500/50 shadow-lg shadow-purple-950/50 scale-[1.02]" 
-                : "bg-slate-950/40 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/50"
-            }`}
-          >
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h4 className="font-bold text-white text-sm">{stock.symbol}.sol</h4>
-                <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded font-mono">SOL</span>
+        <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+          {stocks.map((stock) => (
+            <div 
+              key={stock.symbol}
+              onClick={() => setSelectedStock(stock)}
+              className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${
+                selectedStock.symbol === stock.symbol 
+                  ? "bg-purple-950/40 border-purple-500/50 shadow-lg shadow-purple-950/50 scale-[1.02]" 
+                  : "bg-slate-950/40 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/50"
+              }`}
+            >
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h4 className="font-bold text-white text-sm">{stock.symbol}.sol</h4>
+                  <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.2 rounded font-mono">SOL</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{stock.name.split(" ")[0]}</p>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">{stock.name.split(" ")[0]}</p>
+              <div className="text-right">
+                <p className="font-semibold text-white text-sm">${stock.price.toFixed(2)}</p>
+                <p className={`text-xs font-medium ${stock.change.startsWith("+") ? "text-emerald-400" : "text-rose-400"}`}>
+                  {stock.change}
+                </p>
+              </div>
             </div>
-            <div className="text-right">
-              <p className="font-semibold text-white text-sm">${stock.price}</p>
-              <p className={`text-xs font-medium ${stock.change.startsWith("+") ? "text-emerald-400" : "text-rose-400"}`}>
-                {stock.change}
-              </p>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      {/* Панель деталей и покупки */}
+      {/* Панель деталей и покупки (Правая колонка) */}
       <div className="md:col-span-2 bg-slate-900/90 border border-slate-800/80 rounded-2xl p-6 shadow-2xl space-y-6 backdrop-blur-xl flex flex-col justify-between">
         <div className="space-y-4">
           <div className="flex justify-between items-start">
@@ -113,7 +152,7 @@ export default function Market({ onBuyStock, balance }) {
               <p className="text-sm text-slate-400">{selectedStock.name}</p>
             </div>
             <div className="text-right">
-              <span className="text-2xl font-black text-white">${selectedStock.price}</span>
+              <span className="text-2xl font-black text-white">${selectedStock.price.toFixed(2)}</span>
               <span className={`block text-xs font-semibold ${selectedStock.change.startsWith("+") ? "text-emerald-400" : "text-rose-400"}`}>
                 24h: {selectedStock.change}
               </span>
@@ -153,7 +192,7 @@ export default function Market({ onBuyStock, balance }) {
             onClick={() => onBuyStock(selectedStock)}
             className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl shadow-xl shadow-purple-600/30 transition-all transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
           >
-            <span>Купить {selectedStock.symbol}.sol за ${selectedStock.price}</span>
+            <span>Купить {selectedStock.symbol}.sol за ${selectedStock.price.toFixed(2)}</span>
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
           </button>
         </div>
