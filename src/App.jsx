@@ -3,7 +3,7 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 
 const RPC_ENDPOINT = 'https://api.mainnet-beta.solana.com';
 const connection = new Connection(RPC_ENDPOINT, 'confirmed');
-export default function App() (
+export default function App() 
   const [walletAddress, setWalletAddress] = useState(null);
   const [solBalance, setSolBalance] = useState(null);
   const [transactions, setTransactions] = useState([]);
@@ -82,4 +82,3 @@ return (
    </main>
   </div>
  );
-
