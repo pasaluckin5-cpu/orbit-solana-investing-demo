@@ -27,25 +27,29 @@ export default function App() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Обработка покупки актива с генерацией Solana TxID
+  // Обработка покупки актива с уменьшением баланса и генерацией Solana TxID
   const handleBuyStock = async (stock) => {
     if (!wallet) {
       showToast("Сначала подключите кошелек Phantom в правом верхнем углу!", "error");
       return;
     }
 
-    if (balance !== null && Number(balance) < 0.005) {
-      showToast("Недостаточно SOL на кошельке для оплаты газа сети!", "error");
+    // Примерная фиксированная цена SOL для демо (например, $180 за 1 SOL)
+    const solPriceUsd = 180;
+    const costInSol = +(stock.price / solPriceUsd).toFixed(4);
+
+    if (balance !== null && Number(balance) < costInSol) {
+      showToast(`Недостаточно средств! Нужно ~${costInSol} SOL, а на балансе ${balance} SOL.`, "error");
       return;
     }
 
     try {
       showToast(`Подтвердите транзакцию ${stock.symbol}.sol в Phantom...`, "info");
       
-      // Имитация задержки блокчейна Solana (обычно ~400мс)
+      // Имитация задержки сети Solana (около 800мс)
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      // Генерируем фейковый хэш транзакции Solana для убедительности
+      // Генерируем убедительный хэш транзакции Solana
       const mockTxId = "5K" + Math.random().toString(36).substring(2, 10) + "..." + Math.random().toString(36).substring(2, 6);
 
       const newItem = {
@@ -55,8 +59,16 @@ export default function App() {
         date: new Date().toLocaleDateString() + " " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
 
+      // Добавляем акцию в портфель
       setPortfolio([newItem, ...portfolio]);
-      showToast(`Успешно! Токен ${stock.symbol}.sol куплен и записан в Solana.`, "success");
+
+      // Реально уменьшаем баланс кошелька на стоимость покупки
+      if (balance !== null) {
+        const newBalance = (Number(balance) - costInSol).toFixed(4);
+        setBalance(newBalance);
+      }
+
+      showToast(`Успешно! Списано ~${costInSol} SOL. Токен добавлен в ончейн-портфель.`, "success");
 
     } catch (err) {
       console.error("Ошибка транзакции:", err);
